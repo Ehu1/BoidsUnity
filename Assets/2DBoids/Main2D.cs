@@ -593,34 +593,34 @@ public class Main2D : MonoBehaviour
 
       for (int y = gridCell - gridDimX; y <= gridCell + gridDimX; y += gridDimX)
       {
-        int start = gridOffsets[y - 2];
-        int end = gridOffsets[y + 1];
-        for (int i = start; i < end; i++)
-        {
-          var other = inBoids[i];
-          var diff = boid.pos - other.pos;
-          var distanceSq = math.dot(diff, diff);
-          if (distanceSq > 0 && distanceSq < visualRangeSq)
+          int start = gridOffsets[y - 2];
+          int end = gridOffsets[y + 1];
+          for (int i = start; i < end; i++)
           {
-            if (distanceSq < minDistanceSq)
-            {
-              close += diff / distanceSq;
-            }
-            center += other.pos;
-            avgVel += other.vel;
-            neighbours++;
+              var other = inBoids[i];
+              var diff = boid.pos - other.pos;
+              var distanceSq = math.dot(diff, diff);
+
+              float valid = math.select(0f, 1f, (distanceSq > 0f) & (distanceSq < visualRangeSq));
+              float isMin = math.select(0f, 1f, distanceSq < minDistanceSq);
+              float invDistanceSq = math.select(0f, 1f / distanceSq, distanceSq > 0f);
+
+              close += diff * invDistanceSq * isMin * valid;
+              center += other.pos * valid;
+              avgVel += other.vel * valid;
+              neighbours += (int)valid;
           }
-        }
       }
 
-      if (neighbours > 0)
-      {
-        center /= neighbours;
-        avgVel /= neighbours;
+      float valid = math.select(0f, 1f, neighbours > 0);
+      float scale = valid / (neighbours + math.select(1f, 0f, neighbours > 0));
 
-        boid.vel += (center - boid.pos) * (cohesionFactor * deltaTime);
-        boid.vel += (avgVel - boid.vel) * (alignmentFactor * deltaTime);
-      }
+
+      center *= scale;
+      avgVel *= scale;
+
+      boid.vel += (center - boid.pos) * (cohesionFactor * deltaTime);
+      boid.vel += (avgVel - boid.vel) * (alignmentFactor * deltaTime);
 
       boid.vel += close * (separationFactor * deltaTime);
     }
@@ -634,14 +634,16 @@ public class Main2D : MonoBehaviour
 
     void jobKeepInBounds(ref Boid boid)
     {
-      if (Mathf.Abs(boid.pos.x) > xBound)
-      {
-        boid.vel.x -= Mathf.Sign(boid.pos.x) * deltaTime * turnSpeed;
-      }
-      if (Mathf.Abs(boid.pos.y) > yBound)
-      {
-        boid.vel.y -= Mathf.Sign(boid.pos.y) * deltaTime * turnSpeed;
-      }
+      float xDir = math.sign(boid.pos.x);
+      float xOver = math.max(0f, math.abs(boid.pos.x) - xBound); 
+      float xFactor = math.sign(xOver);
+
+      float yDir = math.sign(boid.pos.y);
+      float yOver = math.max(0f, math.abs(boid.pos.y) - yBound);
+      float yFactor = math.sign(yOver);
+
+      boid.vel.x -= xDir * xFactor * deltaTime * turnSpeed;
+      boid.vel.y -= yDir * yFactor * deltaTime * turnSpeed;
     }
 
     int2 jobGetGridLocation(Boid boid)
@@ -667,11 +669,7 @@ public class Main2D : MonoBehaviour
   public void sliderChange(float val)
   {
     var limit = (int)blockSize * 65535;
-    numBoids = (int)val;
-    if (numBoids > limit)
-    {
-      numBoids = limit;
-    }
+    numBoids = math.min((int)val, limit);
     OnDestroy();
     Start();
   }
