@@ -583,15 +583,24 @@ public class Main2D : MonoBehaviour
 
     void jobMergedBehaviours(ref Boid boid)
     {
+      float visualSq = visualRangeSq;
+      float minDistSq = minDistanceSq;
+      float cohFactor = cohesionFactor;
+      float alignFactor = alignmentFactor;
+      float sepFactor = separationFactor;
+      float dt = deltaTime;
+
       float2 center = float2.zero;
       float2 close = float2.zero;
       float2 avgVel = float2.zero;
       int neighbours = 0;
 
-      var gridXY = jobGetGridLocation(boid);
-      int gridCell = gridDimX * gridXY.y + gridXY.x;
+      int gridX = gridDimX;
 
-      for (int y = gridCell - gridDimX; y <= gridCell + gridDimX; y += gridDimX)
+      var gridXY = jobGetGridLocation(boid);
+      int gridCell = gridX * gridXY.y + gridXY.x;
+
+      for (int y = gridCell - gridX; y <= gridCell + gridX; y += gridX)
       {
           int start = gridOffsets[y - 2];
           int end = gridOffsets[y + 1];
@@ -601,28 +610,26 @@ public class Main2D : MonoBehaviour
               var diff = boid.pos - other.pos;
               var distanceSq = math.dot(diff, diff);
 
-              float valid = math.select(0f, 1f, (distanceSq > 0f) & (distanceSq < visualRangeSq));
-              float isMin = math.select(0f, 1f, distanceSq < minDistanceSq);
+              float valid1 = math.select(0f, 1f, (distanceSq > 0f) & (distanceSq < visualSq));
+              float isMin = math.select(0f, 1f, distanceSq < minDistSq);
               float invDistanceSq = math.select(0f, 1f / distanceSq, distanceSq > 0f);
 
-              close += diff * invDistanceSq * isMin * valid;
-              center += other.pos * valid;
-              avgVel += other.vel * valid;
-              neighbours += (int)valid;
+              close += diff * invDistanceSq * isMin * valid1;
+              center += other.pos * valid1;
+              avgVel += other.vel * valid1;
+              neighbours += (int)valid1;
           }
       }
 
       float valid = math.select(0f, 1f, neighbours > 0);
       float scale = valid / (neighbours + math.select(1f, 0f, neighbours > 0));
 
-
       center *= scale;
       avgVel *= scale;
 
-      boid.vel += (center - boid.pos) * (cohesionFactor * deltaTime);
-      boid.vel += (avgVel - boid.vel) * (alignmentFactor * deltaTime);
-
-      boid.vel += close * (separationFactor * deltaTime);
+      boid.vel += (center - boid.pos) * (cohFactor * dt);
+      boid.vel += (avgVel - boid.vel) * (alignFactor * dt);
+      boid.vel += close * (sepFactor * dt);
     }
 
     void jobLimitSpeed(ref Boid boid)
